@@ -20,11 +20,13 @@ export const generateImage = async (
   contextImageBase64: FileContent | null = null,
   contextImageMimeType: MimeType | null = null
 ): Promise<string> => {
-  if (!process.env.API_KEY) {
-    throw new Error('API_KEY is not defined. Please ensure it is set in your environment.');
+  const apiKey = localStorage.getItem('gemini_api_key') || process.env.API_KEY;
+  
+  if (!apiKey) {
+    throw new Error('API key is not configured. Please set your API key in Settings.');
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   let base64Result: string;
 
   try {

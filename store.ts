@@ -6,6 +6,9 @@ interface AppState {
   theme: Theme;
   setTheme: (theme: Theme) => void;
 
+  apiKey: string | null;
+  setApiKey: (apiKey: string | null) => void;
+
   prompt: string;
   setPrompt: (prompt: string) => void;
 
@@ -37,6 +40,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ theme });
     localStorage.setItem('theme', theme);
     document.documentElement.classList.toggle('dark', theme === 'dark');
+  },
+
+  apiKey: localStorage.getItem('gemini_api_key'),
+  setApiKey: (apiKey) => {
+    set({ apiKey });
+    if (apiKey) {
+      localStorage.setItem('gemini_api_key', apiKey);
+    } else {
+      localStorage.removeItem('gemini_api_key');
+    }
   },
 
   prompt: '',

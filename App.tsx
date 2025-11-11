@@ -13,6 +13,8 @@ import { Card, CardContent, CardFooter, CardDescription, CardHeader, CardTitle }
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './components/ui/DropdownMenu';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ToastContainer } from './components/ToastContainer';
+import { ImageUpload } from './components/ImageUpload';
+import { Settings } from './components/Settings';
 import { AspectRatio, StylePreset } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -20,6 +22,8 @@ const App = () => {
   const {
     theme,
     setTheme,
+    apiKey,
+    setApiKey,
     prompt,
     setPrompt,
     contextImageBase64,
@@ -36,10 +40,20 @@ const App = () => {
   } = useAppStore();
 
   const [currentPlaceholder, setCurrentPlaceholder] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   useEffect(() => {
     // Apply theme from store
     document.documentElement.classList.toggle('dark', theme === 'dark');
+
+    // Check for API key
+    const savedApiKey = localStorage.getItem('gemini_api_key');
+    setHasApiKey(!!savedApiKey);
+    
+    if (!savedApiKey) {
+      setShowSettings(true);
+    }
 
     // Set a random initial prompt placeholder
     const randomIndex = Math.floor(Math.random() * INITIAL_PROMPT_PLACEHOLDERS.length);
@@ -52,6 +66,14 @@ const App = () => {
       addToast('Please enter a prompt or upload a context image.', 'info');
       return;
     }
+
+    // Check for API key
+    if (!hasApiKey) {
+      setShowSettings(true);
+      addToast('Please set up your API key in Settings first.', 'info');
+      return;
+    }
+
     setIsGenerating(true);
     setCurrentImageBase64(null); // Clear previous image
     try {
@@ -65,10 +87,22 @@ const App = () => {
       addToast('Image generated successfully!', 'success');
     } catch (error: any) {
       console.error('Generation error:', error);
-      addToast(`Error generating image: ${error.message}`, 'error');
+      if (error.message.includes('API key')) {
+        addToast('Invalid or missing API key. Please check your Settings.', 'error');
+        setShowSettings(true);
+      } else {
+        addToast(`Error generating image: ${error.message}`, 'error');
+      }
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleSettingsClose = () => {
+    setShowSettings(false);
+    // Check for API key after settings close
+    const savedApiKey = localStorage.getItem('gemini_api_key');
+    setHasApiKey(!!savedApiKey);
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,7 +161,28 @@ const App = () => {
         {/* Navbar */}
         <nav className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold tracking-tight">Pixel AI</h1>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            {!hasApiKey && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full text-sm">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                API Key Required
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSettings(true)}
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Settings
+            </Button>
+            <ThemeToggle />
+          </div>
         </nav>
 
         {/* Generate Tab Content */}
@@ -149,28 +204,13 @@ const App = () => {
 
             <div>
               <h3 className="text-md font-medium mb-2">Context Image (Optional)</h3>
-              <Input
-                id="context-image-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
+              <ImageUpload
+                onImageUpload={handleImageUpload}
+                onImageClear={clearContextImage}
+                imagePreview={contextImageBase64}
+                isUploading={isGenerating}
                 disabled={isGenerating}
-                aria-label="Upload context image"
-                className="mb-2"
               />
-              {contextImageBase64 && (
-                <div className="flex flex-col items-start space-y-2 mt-2">
-                  <img src={contextImageBase64} alt="Context Preview" className="max-w-full sm:max-w-xs h-auto rounded-md border border-muted" />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={clearContextImage}
-                    disabled={isGenerating}
-                  >
-                    Clear Image
-                  </Button>
-                </div>
-              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -274,6 +314,7 @@ const App = () => {
         )}
       </main>
       <ToastContainer />
+      <Settings isOpen={showSettings} onClose={handleSettingsClose} />
     </div>
   );
 };

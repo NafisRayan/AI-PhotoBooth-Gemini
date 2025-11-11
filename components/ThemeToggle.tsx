@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../store';
-import { Button } from './ui/Button'; // Assuming Button component is available
+import { Button } from './ui/Button';
 
 const ThemeToggle = () => {
   const { theme, setTheme } = useAppStore();
