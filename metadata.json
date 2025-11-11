@@ -1,5 +1,4 @@
-
 {
-  "name": "Time-Travel Photo Booth",
-  "description": "Upload a photo, get it analyzed by Gemini, and then use text prompts to insert your face into historical scenes or apply creative edits."
+  "name": "Pixel AI Image Editor",
+  "description": "An AI-powered web application for generating and editing images using the Google Gemini API, featuring a modern, responsive UI with TailwindCSS and shadcn/ui inspired components."
 }

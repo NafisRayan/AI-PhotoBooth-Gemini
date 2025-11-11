@@ -1,107 +1,78 @@
+import { GoogleGenAI, Modality } from '@google/genai';
+import { AspectRatio, ImageGenerationOptions, FileContent, MimeType } from '../types';
 
-import { GoogleGenAI, Modality, GenerateContentResponse } from "@google/genai";
-import { ImageAnalysis } from '../types';
-
-let ai: GoogleGenAI | null = null;
-
-function getGeminiClient(): GoogleGenAI {
-  if (!ai) {
-    if (!process.env.API_KEY) {
-      throw new Error("API_KEY is not defined in environment variables.");
-    }
-    ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getAspectRatioConfig = (aspectRatio: AspectRatio) => {
+  switch (aspectRatio) {
+    case AspectRatio.SQUARE:
+      return '1:1';
+    case AspectRatio.PORTRAIT:
+      return '3:4';
+    case AspectRatio.LANDSCAPE:
+      return '16:9';
+    default:
+      return '1:1';
   }
-  return ai;
-}
+};
 
-export async function analyzeImage(base64Image: string, mimeType: string): Promise<ImageAnalysis> {
-  const client = getGeminiClient();
+export const generateImage = async (
+  prompt: string,
+  options: ImageGenerationOptions,
+  contextImageBase64: FileContent | null = null,
+  contextImageMimeType: MimeType | null = null
+): Promise<string> => {
+  if (!process.env.API_KEY) {
+    throw new Error('API_KEY is not defined. Please ensure it is set in your environment.');
+  }
+
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  let base64Result: string;
+
   try {
-    const response: GenerateContentResponse = await client.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: base64Image,
-            },
-          },
-          {
-            text: 'Describe this image in detail and identify any prominent objects, people, or scenes.',
-          },
-        ],
-      },
-      config: {
-        thinkingConfig: { thinkingBudget: 0 } // Prioritize speed for analysis
+    if (contextImageBase64 && contextImageMimeType) {
+      // Use gemini-2.5-flash-image for multimodal generation
+      const imagePart = {
+        inlineData: {
+          mimeType: contextImageMimeType,
+          data: contextImageBase64.split(',')[1], // Remove "data:image/png;base64," prefix
+        },
+      };
+      const textPart = { text: `${prompt}, ${options.stylePreset}` };
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image', // General Image Generation and Editing Tasks
+        contents: { parts: [imagePart, textPart] },
+        config: {
+          responseModalities: [Modality.IMAGE],
+        },
+      });
+
+      if (response.candidates && response.candidates.length > 0 && response.candidates[0].content?.parts?.[0]?.inlineData) {
+        base64Result = `data:${response.candidates[0].content.parts[0].inlineData.mimeType};base64,${response.candidates[0].content.parts[0].inlineData.data}`;
+      } else {
+        throw new Error('No image generated from multimodal prompt.');
       }
-    });
-
-    const text = response.text;
-    const urls: string[] = [];
-
-    // Extract URLs from grounding chunks if available
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    if (groundingChunks && Array.isArray(groundingChunks)) {
-        for (const chunk of groundingChunks) {
-            if (chunk.web && chunk.web.uri) {
-                urls.push(chunk.web.uri);
-            }
-            if (chunk.maps && chunk.maps.uri) {
-                urls.push(chunk.maps.uri);
-            }
-            if (chunk.maps?.placeAnswerSources && Array.isArray(chunk.maps.placeAnswerSources)) {
-                for (const source of chunk.maps.placeAnswerSources) {
-                    if (source.reviewSnippets && Array.isArray(source.reviewSnippets)) {
-                        for (const snippet of source.reviewSnippets) {
-                            if (snippet.uri) {
-                                urls.push(snippet.uri);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    return { text, urls };
-  } catch (error) {
-    console.error("Error analyzing image with Gemini:", error);
-    throw new Error(`Failed to analyze image. ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
-
-export async function editImage(base64Image: string, mimeType: string, prompt: string): Promise<string> {
-  const client = getGeminiClient();
-  try {
-    const response: GenerateContentResponse = await client.models.generateContent({
-      model: 'gemini-2.5-flash-image', // Model specifically for image editing/generation
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              data: base64Image,
-              mimeType: mimeType,
-            },
-          },
-          {
-            text: prompt,
-          },
-        ],
-      },
-      config: {
-        responseModalities: [Modality.IMAGE], // Must be an array with a single `Modality.IMAGE` element.
-      },
-    });
-
-    const editedImagePart = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (editedImagePart) {
-      return editedImagePart;
     } else {
-      throw new Error("Gemini did not return an edited image.");
+      // Use imagen-4.0-generate-001 for text-only high-quality generation
+      const model = 'imagen-4.0-generate-001';
+      const response = await ai.models.generateImages({
+        model: model,
+        prompt: `${prompt}, ${options.stylePreset}`,
+        config: {
+          numberOfImages: 1,
+          outputMimeType: 'image/jpeg', // imagen-4.0 only supports image/jpeg or image/png
+          aspectRatio: getAspectRatioConfig(options.aspectRatio),
+        },
+      });
+
+      if (response.generatedImages && response.generatedImages.length > 0) {
+        base64Result = `data:image/jpeg;base64,${response.generatedImages[0].image.imageBytes}`;
+      } else {
+        throw new Error('No image generated from text-only prompt.');
+      }
     }
+    return base64Result;
   } catch (error) {
-    console.error("Error editing image with Gemini:", error);
-    throw new Error(`Failed to edit image. ${error instanceof Error ? error.message : String(error)}`);
+    console.error('Error generating image:', error);
+    throw error;
   }
-}
+};
