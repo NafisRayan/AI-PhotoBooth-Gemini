@@ -1,0 +1,5 @@
+
+{
+  "name": "Time-Travel Photo Booth",
+  "description": "Upload a photo, get it analyzed by Gemini, and then use text prompts to insert your face into historical scenes or apply creative edits."
+}
