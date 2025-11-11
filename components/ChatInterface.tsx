@@ -1,5 +1,10 @@
 import React, { useState, useRef, useEffect, FormEvent } from 'react';
 import { ChatMessage } from '../types';
+import { Card, CardContent, CardHeader } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { ScrollArea } from './ui/scroll-area';
+import { Send } from './ui/icons';
 
 interface ChatInterfaceProps {
   messages: ChatMessage[];
@@ -29,61 +34,76 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ messages, onSendMessage, 
   };
 
   return (
-    <div className="flex flex-col h-full bg-card text-card-foreground rounded-lg shadow-sm border border-input">
-      <div className="flex-grow overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 ? (
-          <div className="text-center text-muted-foreground mt-8">
-            <p>Ready for a time-travel adventure?</p>
-            <p>Upload an image and then tell me what to do!</p>
-            <p className="text-sm italic mt-2">Example: "Make me look like I'm in ancient Rome"</p>
-          </div>
-        ) : (
-          messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[70%] p-3 rounded-lg text-sm shadow
-                  ${msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}
-              >
-                {/* Render content as HTML if it contains anchor tags for URLs */}
-                <span dangerouslySetInnerHTML={{ __html: msg.content }} />
+    <Card className="flex flex-col h-full">
+      <CardHeader className="pb-4">
+        <h2 className="text-lg font-semibold">AI Chat Assistant</h2>
+        <p className="text-sm text-muted-foreground">
+          Describe how you want to edit your time-travel photo
+        </p>
+      </CardHeader>
+      
+      <CardContent className="flex-1 flex flex-col p-0">
+        <ScrollArea className="flex-1 px-6">
+          <div className="space-y-4">
+            {messages.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                <div className="space-y-2">
+                  <p className="text-lg">Ready for a time-travel adventure?</p>
+                  <p>Upload an image and tell me what to do!</p>
+                  <p className="text-sm italic">
+                    Example: "Make me look like I'm in ancient Rome"
+                  </p>
+                </div>
               </div>
-            </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-      <form onSubmit={handleSubmit} className="p-4 border-t border-input">
-        <div className="flex items-center">
-          <input
-            type="text"
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            placeholder={loading ? "Generating..." : "Type your time-travel prompt here..."}
-            className="flex-grow h-12 border border-input bg-background rounded-md px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={loading}
-          />
-          <button
-            type="submit"
-            className={`ml-3 px-6 py-2 rounded-md font-semibold text-primary-foreground transition-colors duration-200 h-12
-              ${loading ? 'bg-primary/50 cursor-not-allowed' : 'bg-primary hover:bg-primary/90'}
-            `}
-            disabled={loading}
-          >
-            {loading ? (
-              <svg className="animate-spin h-5 w-5 text-primary-foreground mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
             ) : (
-              'Send'
+              messages.map((msg, index) => (
+                <div
+                  key={index}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-[80%] rounded-lg p-4 text-sm shadow-sm
+                      ${msg.role === 'user' 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-muted text-muted-foreground'
+                      }
+                    `}
+                  >
+                    <div 
+                      dangerouslySetInnerHTML={{ __html: msg.content }} 
+                    />
+                  </div>
+                </div>
+              ))
             )}
-          </button>
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+        
+        <div className="border-t p-4">
+          <form onSubmit={handleSubmit} className="flex space-x-2">
+            <Input
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              placeholder={loading ? "AI is thinking..." : "Type your time-travel prompt..."}
+              className="flex-1"
+              disabled={loading}
+            />
+            <Button 
+              type="submit" 
+              disabled={loading || !inputMessage.trim()}
+              size="icon"
+            >
+              {loading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </form>
         </div>
-      </form>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 
